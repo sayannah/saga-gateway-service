@@ -3,5 +3,8 @@ spring:
     name: saga-gateway-service
   data:
     redis:
-      host:redis
-      port:6379
+      host: redis
+      port: 6379
+
+server:
+  port: 6001
