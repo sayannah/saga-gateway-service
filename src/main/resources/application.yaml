@@ -8,3 +8,6 @@ spring:
 
 server:
   port: 6001
+security:
+  signature-verification:
+    enabled: false # enable for verification
