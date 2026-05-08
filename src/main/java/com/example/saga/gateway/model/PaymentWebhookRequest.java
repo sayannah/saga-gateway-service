@@ -1,4 +1,4 @@
-package com.example.saga_gateway_service.model;
+package com.example.saga.gateway.model;
 
 import lombok.Data;
 import org.springframework.stereotype.Component;

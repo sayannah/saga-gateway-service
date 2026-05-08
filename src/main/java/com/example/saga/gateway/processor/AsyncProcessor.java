@@ -1,6 +1,7 @@
-package com.example.saga_gateway_service.processor;
+package com.example.saga.gateway.processor;
 
-import com.example.saga_gateway_service.model.PaymentWebhookRequest;
+import com.example.saga.gateway.model.PaymentWebhookRequest;
+import com.example.saga.gateway.service.PaymentForwarder;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.BlockingQueue;
@@ -14,7 +15,11 @@ public class AsyncProcessor {
     private final BlockingQueue<PaymentWebhookRequest> queue = new LinkedBlockingQueue<>();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    public AsyncProcessor() {
+    private final PaymentForwarder forwarder;
+
+    public AsyncProcessor(PaymentForwarder forwarder) {
+        this.forwarder = forwarder;
+
         executor.submit(() -> {
             while (true) {
                 PaymentWebhookRequest job = queue.take();
@@ -28,8 +33,8 @@ public class AsyncProcessor {
     }
 
     private void handle(PaymentWebhookRequest job) {
-        System.out.println("Processing async payment: " + job);
-        // heavy work here
+        forwarder.forward(job);
     }
 }
+
 
