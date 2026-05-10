@@ -1,32 +1,36 @@
 services:
-  gateway-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: gateway-service
-    ports:
-      - "6001:6001"
-    depends_on:
-      - redis
-    environment:
-      SERVER_PORT: 6001
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-    #mock-websocket-server:
-    #build: ./mock-websocket-server
-    #container_name: mock-websocket-server
-    #ports:
-    #  - "8090:8090"
-    #gateway-service-2:
-    #build: .
-    #container_name: gateway-service-2
-    #ports:
-    #  - "8081:8080"
-    #depends_on:
-    #  - redis
-
   redis:
     image: redis:7
     container_name: redis
     ports:
       - "6379:6379"
+
+  external-ledger:
+    build:
+      context: ../external.ledger
+      dockerfile: Dockerfile
+    container_name: external-ledger
+    ports:
+      - "6002:6002"
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "6001:6001"
+    depends_on:
+      redis:
+        condition: service_started
+      external-ledger:
+        condition: service_started
+    environment:
+      SERVER_PORT: 6001
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SYSTEM_B_WS_URL: ws://external-ledger:6002/mock-ws
+      SIGNATURE_VERIFICATION_ENABLED: "true"
+      SIGNATURE_PUBLIC_KEY_PATH: "classpath:keys/public.pem"
+      systema.webhook.url: "http://host.docker.internal:8081/api/v1/ack"
+    deploy:
+      replicas: 2

@@ -8,3 +8,16 @@ spring:
 
 server:
   port: 6001
+signature:
+  verification:
+    enabled: ${SIGNATURE_VERIFICATION_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+

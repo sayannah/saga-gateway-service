@@ -1,4 +1,4 @@
-package com.example.saga_gateway_service;
+package com.example.saga.gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
