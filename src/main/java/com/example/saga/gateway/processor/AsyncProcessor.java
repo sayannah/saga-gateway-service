@@ -1,40 +1,26 @@
 package com.example.saga.gateway.processor;
 
-import com.example.saga.gateway.model.PaymentWebhookRequest;
 import com.example.saga.gateway.service.PaymentForwarder;
+import com.example.saga.gateway.service.TransactionStateService;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 
 @Component
 public class AsyncProcessor {
 
-    private final BlockingQueue<PaymentWebhookRequest> queue = new LinkedBlockingQueue<>();
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-
     private final PaymentForwarder forwarder;
+    private final TransactionStateService stateService;
 
-    public AsyncProcessor(PaymentForwarder forwarder) {
+    public AsyncProcessor(PaymentForwarder forwarder,
+                          TransactionStateService stateService) {
         this.forwarder = forwarder;
-
-        executor.submit(() -> {
-            while (true) {
-                PaymentWebhookRequest job = queue.take();
-                handle(job);
-            }
-        });
+        this.stateService = stateService;
     }
 
-    public void submit(PaymentWebhookRequest job) {
-        queue.offer(job);
+    public void handleWsResponse(String txId, String status) {
+        stateService.updateState(txId, status);
     }
 
-    private void handle(PaymentWebhookRequest job) {
-        forwarder.forward(job);
+    public void process(String txId, String payload) {
+        forwarder.forwardToLedger(txId, payload);
     }
 }
-
-

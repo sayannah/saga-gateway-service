@@ -1,7 +1,5 @@
 package com.example.saga.gateway.websocket;
 
-import com.example.saga.gateway.service.TransactionStateService;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -10,25 +8,28 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @Component
 public class GatewayWsHandler extends TextWebSocketHandler {
 
-    private WebSocketSession session;
-    private final TransactionStateService stateService;
+    private final WsMessageCallback callback;
 
-    public GatewayWsHandler(TransactionStateService stateService) {
-        this.stateService = stateService;
+    public GatewayWsHandler(WsMessageCallback callback) {
+        this.callback = callback;
     }
 
     @Override
-    public void afterConnectionEstablished(@NotNull WebSocketSession session) {
-        this.session = session;
-        System.out.println("Gateway WS: handler session established");
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        String payload = message.getPayload();
+
+        // parse txId + status from JSON
+        String txId = extractTxId(payload);
+        String status = extractStatus(payload);
+
+        callback.onMessage(txId, status);
     }
 
-    @Override
-    public void handleTextMessage(@NotNull WebSocketSession session, TextMessage message) {
-        stateService.applyBackendResult(message.getPayload());
+    private String extractTxId(String json) {
+        return json.split("\"transactionId\":\"")[1].split("\"")[0];
     }
 
-    public WebSocketSession getSession() {
-        return session;
+    private String extractStatus(String json) {
+        return json.split("\"status\":\"")[1].split("\"")[0];
     }
 }

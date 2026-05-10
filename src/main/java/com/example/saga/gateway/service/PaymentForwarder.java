@@ -1,38 +1,27 @@
 package com.example.saga.gateway.service;
 
-import com.example.saga.gateway.model.PaymentWebhookRequest;
 import com.example.saga.gateway.websocket.GatewayWsClient;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 
-@Component
+@Service
 public class PaymentForwarder {
 
     private final GatewayWsClient wsClient;
-    private final TransactionStateService stateService;
 
-    public PaymentForwarder(GatewayWsClient wsClient,
-                            TransactionStateService stateService) {
+    public PaymentForwarder(GatewayWsClient wsClient) {
         this.wsClient = wsClient;
-        this.stateService = stateService;
     }
 
-    public void forward(PaymentWebhookRequest req) {
-
-        // 1. Mark state as PROCESSING
-        stateService.markProcessing(req.getTransactionId());
-
-        // 2. Build JSON payload for System B
-        String json = """
-                {
-                  "transactionId": "%s",
-                  "payload": "%s"
-                }
-                """.formatted(req.getTransactionId(), req.getPayload());
-
-        // 3. Send to System B via WebSocket
-        wsClient.send(json);
-
-        System.out.println("Forwarded to System B → " + req.getTransactionId());
+    public void forwardToLedger(String txId, String payload) {
+        try {
+            WebSocketSession session = wsClient.getSession();
+            if (session != null && session.isOpen()) {
+                session.sendMessage(new TextMessage(payload));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
-
