@@ -1,48 +1,28 @@
 package com.example.saga.gateway.service;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Map;
-
 @Service
+@Slf4j
 public class ReverseWebhookService {
 
     private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final String systemAUrl;
+    private final String ackUrl;
 
-    public ReverseWebhookService(@Value("${systema.webhook.url}") String systemAUrl) {
-        this.systemAUrl = systemAUrl;
+    public ReverseWebhookService() {
+        this.ackUrl = System.getenv("systema.webhook.url");
     }
 
-    public void sendAck(String txId, String finalStatus) {
+    public void sendAck(String txId, String status) {
         try {
-            Map<String, Object> body = Map.of(
-                    "transactionId", txId,
-                    "status", finalStatus
-            );
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-
-            ResponseEntity<String> resp =
-                    restTemplate.postForEntity(systemAUrl, entity, String.class);
-
-            System.out.println("Ack sent to System A → " + txId + " = " + finalStatus
-                    + " (HTTP " + resp.getStatusCode() + ")");
-
+            var body = new AckPayload(txId, status);
+            restTemplate.postForEntity(ackUrl, body, String.class);
+            log.info("ACK delivered to System A: {} {}", txId, status);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("ACK delivery failed (System A offline): {}", e.getMessage());
         }
     }
-}
 
+    record AckPayload(String transactionId, String status) {}
+}

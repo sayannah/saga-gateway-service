@@ -34,23 +34,22 @@ public class SignatureVerifier {
         if (!enabled) return true;
 
         try {
-            // rawJson + timestamp → SHA-384
-            String message = rawJson + timestamp;
-
-            MessageDigest digest = MessageDigest.getInstance("SHA-384");
-            byte[] hash = digest.digest(message.getBytes(StandardCharsets.UTF_8));
+            String signingString = timestamp + rawJson;
 
             byte[] sigBytes = Base64.getDecoder().decode(signatureBase64);
 
-            Signature verifier = Signature.getInstance("SHA384withECDSA");
+            Signature verifier = Signature.getInstance("SHA384withECDSA", "BC");
             verifier.initVerify(publicKey);
-            verifier.update(hash);
+            verifier.update(signingString.getBytes(StandardCharsets.UTF_8));
 
             return verifier.verify(sigBytes);
         } catch (Exception e) {
+            e.printStackTrace();
             return false;
         }
     }
+
+
     private PublicKey loadPublicKeyFromPem(String pem) throws Exception {
         String clean = pem
                 .replace("-----BEGIN PUBLIC KEY-----", "")

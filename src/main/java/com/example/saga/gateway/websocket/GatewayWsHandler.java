@@ -1,5 +1,7 @@
 package com.example.saga.gateway.websocket;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -9,6 +11,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 public class GatewayWsHandler extends TextWebSocketHandler {
 
     private final WsMessageCallback callback;
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public GatewayWsHandler(WsMessageCallback callback) {
         this.callback = callback;
@@ -16,20 +19,18 @@ public class GatewayWsHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        String payload = message.getPayload();
+        try {
+            String payload = message.getPayload();
 
-        // parse txId + status from JSON
-        String txId = extractTxId(payload);
-        String status = extractStatus(payload);
+            JsonNode node = mapper.readTree(payload);
 
-        callback.onMessage(txId, status);
-    }
+            String txId = node.get("transactionId").asText();
+            String status = node.get("status").asText();
 
-    private String extractTxId(String json) {
-        return json.split("\"transactionId\":\"")[1].split("\"")[0];
-    }
+            callback.onMessage(txId, status);
 
-    private String extractStatus(String json) {
-        return json.split("\"status\":\"")[1].split("\"")[0];
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
