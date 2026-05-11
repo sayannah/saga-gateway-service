@@ -1,36 +1,42 @@
 package com.example.saga.gateway.websocket;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
+import com.example.saga.gateway.service.ErrBusyRetryService;
+import com.example.saga.gateway.service.ReverseWebhookService;
+import com.example.saga.gateway.service.TransactionStateService;
+import com.example.saga.gateway.util.JsonUtils;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.stereotype.Component;
 
 @Component
 public class GatewayWsHandler extends TextWebSocketHandler {
 
-    private final WsMessageCallback callback;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final TransactionStateService stateService;
+    private final ReverseWebhookService reverseWebhookService;
+    private final ErrBusyRetryService errBusyRetryService;
 
-    public GatewayWsHandler(WsMessageCallback callback) {
-        this.callback = callback;
+    public GatewayWsHandler(TransactionStateService stateService,
+                            ReverseWebhookService reverseWebhookService,
+                            ErrBusyRetryService errBusyRetryService) {
+        this.stateService = stateService;
+        this.reverseWebhookService = reverseWebhookService;
+        this.errBusyRetryService = errBusyRetryService;
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        try {
-            String payload = message.getPayload();
+    public void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        String incoming = message.getPayload();
+        System.out.println("Gateway received WS: " + incoming);
 
-            JsonNode node = mapper.readTree(payload);
+        String txId = JsonUtils.extractField(incoming, "transactionId");
+        String status = JsonUtils.extractField(incoming, "status");
 
-            String txId = node.get("transactionId").asText();
-            String status = node.get("status").asText();
-
-            callback.onMessage(txId, status);
-
-        } catch (Exception e) {
-            e.printStackTrace();
+        if ("ERR_BUSY".equals(status)) {
+            errBusyRetryService.scheduleRetry(txId, incoming);
+            return;
         }
+
+        reverseWebhookService.sendAck(txId, status);
     }
 }

@@ -1,7 +1,5 @@
 package com.example.saga.gateway.processor;
 
-
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -19,21 +17,21 @@ public class QueuePublisher {
         this.redis = redis;
     }
 
-    public void publish(String txId, String rawJson) {
-        try {
-            var record = StreamRecords.newRecord()
-                    .in(STREAM_KEY)
-                    .ofMap(Map.of(
-                            "transactionId", txId,
-                            "payload", rawJson
-                    ));
+    public void publish(String txId, String rawJson, String eventType) {
 
-            RecordId id = redis.opsForStream().add(record);
-
-            System.out.println("Enqueued → " + txId + " @ " + id);
-
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (txId == null || eventType == null || rawJson == null) {
+            throw new IllegalArgumentException("Null values passed to QueuePublisher");
         }
+
+        var record = StreamRecords.newRecord()
+                .in(STREAM_KEY)
+                .ofMap(Map.of(
+                        "transactionId", txId,
+                        "payload", rawJson,
+                        "eventType", eventType
+                ));
+
+        redis.opsForStream().add(record);
     }
+
 }

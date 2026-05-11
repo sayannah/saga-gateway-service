@@ -20,7 +20,7 @@ public class RedisLockService {
 
     public boolean tryLock(String txId) {
         String key = LOCK_PREFIX + txId;
-        String value = instanceId + ":" + System.currentTimeMillis();
+        String value = instanceId + "::" + System.currentTimeMillis();
         Boolean ok = redis.opsForValue().setIfAbsent(
                 key,
                 value,
