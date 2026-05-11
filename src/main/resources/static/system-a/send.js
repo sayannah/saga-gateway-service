@@ -1,68 +1,37 @@
-import fs from "fs";
-import axios from "axios";
-import crypto from "crypto";
+const axios = require("axios");
+const { sign } = require("./sign");
 
-// Path to private key relative to this file
-const PRIVATE_KEY_PATH = "../../keys/private.pem";
-
-// Load private key
-const privateKeyPem = fs.readFileSync(new URL(PRIVATE_KEY_PATH, import.meta.url), "utf8");
-const privateKey = crypto.createPrivateKey({
-    key: privateKeyPem,
-    format: "pem",
-    type: "pkcs8"
-});
-
-// Sign payload
-function signPayload(rawJson) {
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signingString = timestamp + rawJson;
-
-    const sign = crypto.createSign("SHA384");
-    sign.update(signingString);
-    sign.end();
-
-    const derSignature = sign.sign({
-        key: privateKey,
-        dsaEncoding: "der"
+async function sendWebhook() {
+    const body = JSON.stringify({
+        transactionId: "tx-3",
+        eventType: "COMMIT",
     });
 
-    return {
-        timestamp,
-        signature: derSignature.toString("base64")
-    };
-}
+    const timestamp = Date.now().toString();
+    const signature = sign(timestamp, body);
 
-// Send webhook
-async function sendWebhook(txId, status) {
-    const rawJson = JSON.stringify({ transactionId: txId, status });
-
-    const { timestamp, signature } = signPayload(rawJson);
-
-    const headers = {
-        "Content-Type": "application/json",
-        "X-Timestamp": timestamp,
-        "X-Signature": signature
-    };
-
-    console.log("Sending webhook...");
-    console.log("Timestamp:", timestamp);
-    console.log("Signature:", signature);
+    console.log("timestamp:", timestamp);
+    console.log("body:", body);
+    console.log("signature:", signature);
 
     try {
-        const res = await axios.post("http://localhost:6001/api/v1/webhook", rawJson, { headers });
-        console.log("Gateway response:", res.status, res.statusText);
+        const res = await axios.post(
+            "http://localhost:6001/api/v1/webhook",
+            body,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Timestamp": timestamp,
+                    "X-Signature": signature,
+                },
+                timeout: 2000,
+            }
+        );
+
+        console.log("Response:", res.status);
     } catch (err) {
-        console.error("Error:", err.response?.status, err.response?.data);
+        console.log("Error:", err.response?.status || "NO_RESPONSE");
     }
 }
 
-// CLI usage
-const [,, txId, status] = process.argv;
-
-if (!txId || !status) {
-    console.log("Usage: node send.js <transactionId> <status>");
-    process.exit(1);
-}
-
-sendWebhook(txId, status);
+sendWebhook();

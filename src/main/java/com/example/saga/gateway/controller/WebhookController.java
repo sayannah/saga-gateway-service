@@ -1,48 +1,63 @@
 package com.example.saga.gateway.controller;
 
 import com.example.saga.gateway.config.SignatureVerifier;
-import com.example.saga.gateway.processor.AsyncProcessor;
-import com.example.saga.gateway.service.TransactionStateService;
-import org.springframework.http.HttpStatus;
+import com.example.saga.gateway.processor.QueuePublisher;
+import com.example.saga.gateway.util.JsonUtils;
+import com.fasterxml.jackson.databind.JsonNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
-@RequestMapping("/api/v1/webhook")
+@RequestMapping("/api/v1")
 public class WebhookController {
 
     private final SignatureVerifier signatureVerifier;
-    private final TransactionStateService stateService;
-    private final AsyncProcessor asyncProcessor;
+    private final QueuePublisher queuePublisher;
 
     public WebhookController(SignatureVerifier signatureVerifier,
-                             TransactionStateService stateService,
-                             AsyncProcessor asyncProcessor) {
+                             QueuePublisher queuePublisher) {
         this.signatureVerifier = signatureVerifier;
-        this.stateService = stateService;
-        this.asyncProcessor = asyncProcessor;
+        this.queuePublisher = queuePublisher;
     }
 
-    @PostMapping
-    public ResponseEntity<?> receiveWebhook(
-            @RequestHeader("X-Signature") String signature,
+    @PostMapping("/webhook")
+    public ResponseEntity<Void> handleWebhook(
             @RequestHeader("X-Timestamp") String timestamp,
-            @RequestBody String payload) {
+            @RequestHeader("X-Signature") String signature,
+            @RequestBody String rawJson) {
 
-        if (!signatureVerifier.verifyRequest(payload, signature, timestamp)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid signature");
+        long start = System.nanoTime();
+
+        // 1. Signature verification (can be disabled via env)
+        if (!signatureVerifier.verifyRequest(rawJson, signature, timestamp)) {
+            log.warn("Signature verification failed");
+            return ResponseEntity.status(403).build();
         }
 
-        String txId = extractTxId(payload);
+        // 2. Parse JSON safely
+        JsonNode node = JsonUtils.parse(rawJson);
+        if (node == null) {
+            log.error("Invalid JSON payload");
+            return ResponseEntity.badRequest().build();
+        }
 
-        stateService.updateState(txId, "RECEIVED");
-        asyncProcessor.process(txId, payload);
+        // 3. Extract required fields
+        String txId = node.path("transactionId").asText(null);
+        String eventType = node.path("eventType").asText(null);
 
-        return ResponseEntity.accepted().body("accepted");
-    }
+        if (txId == null || eventType == null) {
+            log.error("Missing required fields: txId={}, eventType={}", txId, eventType);
+            return ResponseEntity.badRequest().build();
+        }
 
+        // 4. Publish to Redis Stream
+        queuePublisher.publish(txId, rawJson, eventType);
 
-    private String extractTxId(String json) {
-        return json.split("\"transactionId\":\"")[1].split("\"")[0];
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        log.info("Webhook accepted in {} ms", elapsedMs);
+
+        return ResponseEntity.accepted().build();
     }
 }
