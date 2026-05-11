@@ -1,3 +1,7 @@
+# Architecture diagram
+
+![img.png](img.png)
+
 # Saga Gateway Service 
 A lightweight HTTP → Redis → WebSocket gateway implementing a distributed Saga pattern between System A (webhooks) and System B (WebSocket ledger).
 
