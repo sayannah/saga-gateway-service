@@ -1,3 +1,7 @@
+# Architecture diagram
+
+![img.png](img.png)
+
 # Saga Gateway Service 
 A lightweight HTTP → Redis → WebSocket gateway implementing a distributed Saga pattern between System A (webhooks) and System B (WebSocket ledger).
 
@@ -40,17 +44,23 @@ Content-Type: application/json
 docker compose up --build
 
 ## Test webhook (Windows CMD):
-curl -X POST http://localhost:6001/api/v1/webhook -H "Content-Type: application/json" -H "X-Timestamp: 123" -H "X-Signature: test" -d "{\"transactionId\":\"tx-1\",\"eventType\":\"RESERVE\"}"
+- node send.js tx-1 COMPENSATE [Note: this can be used to get timestamp and signature to use in the curl.]
+- curl -X POST http://localhost:6001/api/v1/webhook -H "Content-Type: application/json" -H "X-Timestamp: 123" -H "X-Signature: test" -d "{\"transactionId\":\"tx-1\",\"eventType\":\"RESERVE\"}"
+
+## Test using script
+- node send.js tx-1 COMPENSATE
+- node send.js tx-1 COMMIT
+- node send.js tx-1 RESERVE
 
 ## Redis Debugging
 docker exec -it redis redis-cli XRANGE tx-events-stream - +
 docker exec -it redis redis-cli GET tx:state:tx-1
 
 ## Testing scripts
-1. loadtest.js – Full assessment load test (5k TPS, p99, reconciliation)
+1. loadtest.js – Full assessment load test (2k TPS, p99, reconciliation)
 2. send.js – Simple manual test script for single transactions
 3. ack.js – Mock System A ACK receiver (must run in background)
 
 ## Notes/Pending Actions:
-1. Signature verification is disabled and path is not correct as of now.
-2. Full performance test and improvement is yet to be completed.
+1. Full performance test and improvement is yet to be completed.
+2. Disable sign verification before loadtest run.

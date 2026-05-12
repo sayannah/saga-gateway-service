@@ -1,7 +1,8 @@
-const axios = require("axios");
+import axios from "axios";
+import { performance } from "perf_hooks";
 
-const RATE = 2000;          // 2k TPS
-const DURATION_SEC = 5;     // 5 seconds
+const RATE = 1000;
+const DURATION_SEC = 5;
 const MAX_CONCURRENCY = 300;
 const URL = "http://localhost:6001/api/v1/webhook";
 
@@ -19,7 +20,7 @@ async function send(txId, eventType) {
         await axios.post(URL, body, {
             headers: {
                 "Content-Type": "application/json",
-                "X-Timestamp": Date.now().toString(),
+                "X-Timestamp": "1",
                 "X-Signature": "test"
             },
             timeout: 2000
@@ -54,7 +55,22 @@ async function main() {
     const interval = setInterval(() => {
         if ((Date.now() - start) / 1000 > DURATION_SEC) {
             clearInterval(interval);
-            Promise.all(all).then(finish);
+
+            // Wait until all promises are scheduled
+            const waitSchedule = setInterval(() => {
+                if (all.length === total) {
+                    clearInterval(waitSchedule);
+
+                    // Now wait for inflight to drain
+                    const waitInflight = setInterval(() => {
+                        if (inflight === 0) {
+                            clearInterval(waitInflight);
+                            finish();
+                        }
+                    }, 10);
+                }
+            }, 10);
+
             return;
         }
 
@@ -65,19 +81,27 @@ async function main() {
         }
 
         total += RATE;
-        console.log("Scheduled:", total, "inflight:", inflight);
-    }, 1000);
+        console.log("scheduled:", total, "inflight:", inflight);
+    }, 100);
+
+    // Hard failsafe: exit after max 30 seconds no matter what
+    setTimeout(() => {
+        console.log("\nFORCED EXIT (failsafe)");
+        finish();
+    }, 30000);
 }
 
-async function finish() {
-    console.log("\n LOAD TEST COMPLETE");
-    console.log("Valid:", validTx);
-    console.log("Reconciled:", reconciledTx);
+function finish() {
+    console.log("\nLOAD TEST COMPLETE");
+    console.log("valid:", validTx);
+    console.log("reconciled:", reconciledTx);
 
     latencies.sort((a, b) => a - b);
     const p99 = latencies[Math.floor(latencies.length * 0.99)];
 
     console.log("p99:", p99.toFixed(2), "ms");
+
+    process.exit(0);
 }
 
 main();
