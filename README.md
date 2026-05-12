@@ -48,9 +48,9 @@ docker compose up --build
 - curl -X POST http://localhost:6001/api/v1/webhook -H "Content-Type: application/json" -H "X-Timestamp: 123" -H "X-Signature: test" -d "{\"transactionId\":\"tx-1\",\"eventType\":\"RESERVE\"}"
 
 ## Test using script
-node send.js tx-1 COMPENSATE
-node send.js tx-1 COMMIT
-node send.js tx-1 RESERVE
+- node send.js tx-1 COMPENSATE
+- node send.js tx-1 COMMIT
+- node send.js tx-1 RESERVE
 
 ## Redis Debugging
 docker exec -it redis redis-cli XRANGE tx-events-stream - +
