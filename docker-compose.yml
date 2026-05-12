@@ -29,7 +29,7 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SYSTEM_B_WS_URL: ws://external-ledger:6002/mock-ws
-      SIGNATURE_VERIFICATION_ENABLED: "false"
+      SIGNATURE_VERIFICATION_ENABLED: "true"
       SIGNATURE_PUBLIC_KEY_PATH: "classpath:keys/public.pem"
       systema.webhook.url: "http://host.docker.internal:8081/api/v1/ack"
     deploy:

@@ -1,37 +1,34 @@
-const axios = require("axios");
-const { sign } = require("./sign");
+import axios from "axios";
+import { signPayload } from "./sign.js";
 
-async function sendWebhook() {
-    const body = JSON.stringify({
-        transactionId: "tx-3",
-        eventType: "COMMIT",
-    });
+async function sendWebhook(txId, eventType) {
+    const rawJson = JSON.stringify({ transactionId: txId, eventType });
+    const { timestamp, signature } = signPayload(rawJson);
 
-    const timestamp = Date.now().toString();
-    const signature = sign(timestamp, body);
+    const headers = {
+        "Content-Type": "application/json",
+        "X-Timestamp": timestamp,
+        "X-Signature": signature
+    };
 
-    console.log("timestamp:", timestamp);
-    console.log("body:", body);
-    console.log("signature:", signature);
+    console.log("Sending:", rawJson);
+    console.log("Timestamp:", timestamp);
+    console.log("Signature:", signature);
 
     try {
-        const res = await axios.post(
-            "http://localhost:6001/api/v1/webhook",
-            body,
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Timestamp": timestamp,
-                    "X-Signature": signature,
-                },
-                timeout: 2000,
-            }
-        );
-
-        console.log("Response:", res.status);
+        const res = await axios.post("http://localhost:6001/api/v1/webhook", rawJson, { headers });
+        console.log("Gateway response:", res.status, res.statusText);
     } catch (err) {
-        console.log("Error:", err.response?.status || "NO_RESPONSE");
+        console.error("Error:", err.response?.status, err.response?.data);
     }
 }
 
-sendWebhook();
+// CLI usage
+const [,, txId, eventType] = process.argv;
+
+if (!txId || !eventType) {
+    console.log("Usage: node send.js <transactionId> <RESERVE|COMMIT|COMPENSATE>");
+    process.exit(1);
+}
+
+sendWebhook(txId, eventType);

@@ -1,20 +1,36 @@
-const crypto = require("crypto");
-const secp256k1 = require("secp256k1");
-const fs = require("fs");
+import fs from "fs";
+import crypto from "crypto";
 
-const privateKey = fs.readFileSync(
-    "C:/Users/sayan/saga-gateway-service/src/main/resources/keys/private.raw"
-);
+const PRIVATE_KEY_PATH = "../../keys/private.pem";
 
-function sign(timestamp, body) {
-    const data = timestamp + body;
+// Load private key
+const privateKeyPem = fs.readFileSync(new URL(PRIVATE_KEY_PATH, import.meta.url), "utf8");
+const privateKey = crypto.createPrivateKey({
+    key: privateKeyPem,
+    format: "pem",
+    type: "pkcs8"
+});
 
-    // SHA-384 → SHA-256 (32 bytes)
-    const h384 = crypto.createHash("sha384").update(data).digest();
-    const h256 = crypto.createHash("sha256").update(h384).digest(); // 32 bytes
+/**
+ * Signs a raw JSON string using:
+ *   SHA384 + ECDSA(secp384r1) + DER encoding
+ *   signingString = timestamp + rawJson
+ */
+export function signPayload(rawJson) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signingString = timestamp + rawJson;
 
-    const { signature } = secp256k1.ecdsaSign(h256, privateKey);
-    return Buffer.from(signature).toString("hex");
+    const sign = crypto.createSign("SHA384");
+    sign.update(signingString);
+    sign.end();
+
+    const derSignature = sign.sign({
+        key: privateKey,
+        dsaEncoding: "der"
+    });
+
+    return {
+        timestamp,
+        signature: derSignature.toString("base64")
+    };
 }
-
-module.exports = { sign };
